@@ -16,16 +16,20 @@ int main(int argc,char *argv[])
   MPI_Comm_size(MPI_COMM_WORLD,&size); //number of processor's
   
   
-  int n = 100,part = n/size,rem= n%size;
-  
+  int n,part,rem;
   //operations performed by rank 0
   if(rank == 0){
-    
+    cout << "Enter n to perform their addition: ";
+    cin >> n;
+    part = n/size;
+    rem = n%size;
+  }
+  MPI_Bcast(&part,1,MPI_INT,0,MPI_COMM_WORLD);
+  
+  if(rank == 0){
   vector<int> A(n);
-    
   for(int i = 0 ; i < n ; ++i)
     A[i] = i+1;
-    
   int sum = 0;
   
   for(int i = 0 ; i < part ; ++i )
@@ -61,17 +65,13 @@ int main(int argc,char *argv[])
     
   vector<int> sub(part);
   MPI_Recv(sub.data(),part,MPI_INT,0,1,MPI_COMM_WORLD,&status);
-    
   int local_sum = 0;
-    
   for(int i = 0 ; i < part ; ++i){
     local_sum += sub[i];
   }
-    
   //cout << "Rank" << rank << ": " << local_sum << endl;
   MPI_Send(&local_sum,1,MPI_INT,0,2,MPI_COMM_WORLD);
   }
-  
   MPI_Finalize();
   return 0;
 }
