@@ -5,24 +5,19 @@
 
 using namespace std;
 
-void gaussian_elimination(vector<double> &A, vector<double> &b)
+vector<double> back_substitutio(vector<double>& A,vector<double>&b)
 {
     int n = b.size();
-    for (int i = 0; i < n; ++i)
-    {
-        double pivot = A[i * n + i];
-        for (int j = i; j < n; ++j)
-            A[i * n + j] /= pivot; // Division step
-        b[i] /= pivot;
+    vector<double> x(n);
 
-        for (int j = i + 1; j < n; ++j)
-        {
-            double factor = A[j * n + i];
-            for (int k = i; k < n; ++k)
-                A[j * n + k] -= factor * A[i * n + k]; // Elimination step
-            b[j] -= factor * b[i];
-        }
+    for(int i = n -1 ; i>= 0 ;--i)
+    {
+        x[i] = b[i];
+        for(int j = i-1 ; j >= 0;--j)
+            b[j] -= x[i]*A[j*n+i];
     }
+
+    return x;
 }
 
 int read_from_file(string filename, vector<double> &A, vector<double> &b)
@@ -65,9 +60,9 @@ int main(int argc, char *argv[])
         }
 
         n = b.size(); // dimension of A and b
-        if (size > n) // number of processors cannot be greater than # of rows of A
+        if (size != n) // number of processors cannot be greater than # of rows of A
         {
-            cerr << "Error: p cannot be greater than n." << endl;
+            cerr << "Error: p must be equal to " << n << endl;
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
         int row_per_pro = n / size, rem = n % size;
@@ -101,13 +96,7 @@ int main(int argc, char *argv[])
         }
     }
     MPI_Scatterv(b.data(), sendcounts.data(), disp.data(), MPI_DOUBLE, b_local.data(), local_n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    // for(int i = 0; i < recvcount/n; ++i)
-    // {
-    //         for(int j = 0; j < n ; ++j)
-    //             cout << row[i*(recvcount/n)+j] << " ";
-    //         cout << endl;
-    // }
-
+    
     for (int i = 0; i < n; ++i)
     {
         // ith processor perform division
@@ -122,6 +111,7 @@ int main(int argc, char *argv[])
             pivot_row = row;
             pivot_b = b_local[0];
         }
+
         // then performs one-to-all broadcast of the ith/pivot row)
         MPI_Bcast(pivot_row.data(), n, MPI_DOUBLE, i, MPI_COMM_WORLD);
         MPI_Bcast(&pivot_b, 1, MPI_DOUBLE, i, MPI_COMM_WORLD);
@@ -142,24 +132,16 @@ int main(int argc, char *argv[])
         MPI_Gather(row.data(),n,MPI_DOUBLE,A.data(),n,MPI_DOUBLE,0,MPI_COMM_WORLD);
         MPI_Gather(b_local.data(),1,MPI_DOUBLE,b.data(),1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
-        // if(rank == 0)
-        // {
-        //     for(int j = 0; j < n ; ++j)
-        //     {
-                
-        //         for(int k = 0; k < n ; ++k)
-        //         {
-        //             cout << A[j*n+k] << " ";
-        //         }
-        //         cout << b[j] <<  endl;
-    
-        //     }
-        // }
     }
-    // cout << "Rank " << rank << ": ";
-    // for (int j = 0; j < n; ++j)
-    //     cout << row[j] << " ";
-    // cout << b_local[0] << endl;
+
+    if(rank == 0)
+    {
+        vector<double> sol = back_substitutio(A,b);
+        for(int i = 0; i < sol.size() ; ++i)
+            cout << "x" << i+1 << " = " << sol[i] << endl; 
+    }
+    
+
 
     MPI_Finalize();
     return 0;
